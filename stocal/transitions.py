@@ -128,7 +128,7 @@ class Transition(with_metaclass(abc.ABCMeta, object)):
         
     @property
     def affected_species(self):
-        return [self.true_reactants, self.true_products]
+        return [self.true_reactants.union(self.true_products)] # Not a union this way
 
     @abc.abstractmethod
     def next_occurrence(self, time, state):
@@ -447,9 +447,12 @@ class Process(object):
             warnings.warn("pass start time as tstart", DeprecationWarning)
         tstart = tstart or t
 
-        if (all(isinstance(r, Reaction) for r in self.transitions)
-                and all(issubclass(r.Transition, Reaction) for r in self.rules)):
-            from .algorithms import DirectMethod as Sampler
-        else:
-            from .algorithms import FirstReactionMethod as Sampler
+        # if (all(isinstance(r, Reaction) for r in self.transitions)
+        #        and all(issubclass(r.Transition, Reaction) for r in self.rules)):
+        #    from .algorithms import DirectMethod as Sampler
+        # else:
+        #    from .algorithms import FirstReactionMethod as Sampler
+
+        from .algorithms import NextReactionMethod as Sampler
+
         return Sampler(self, state, tstart, tmax, steps)

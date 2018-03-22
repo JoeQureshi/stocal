@@ -69,10 +69,13 @@ class TrajectorySampler(with_metaclass(abc.ABCMeta, object)):
         self.time = t
         self.tmax = tmax
 
+        self.state = multiset()
+        self.update_state(state)
+
         self.transitions = []
         for transition in self.process.transitions:
             self.add_transition(transition)
-        self.state = multiset()
+
         self.update_state(state)
 
     @abc.abstractmethod
@@ -249,15 +252,12 @@ class FirstReactionMethod(TrajectorySampler):
 
 
 class NextReactionMethod(TrajectorySampler):
-
-    def __init__(self, process, state):
-        super().__init__(process, state)
+    def __init__(self, process, state, t=0., tmax=float('inf'), steps=None):
 
         self.dependency_graph = DependencyGraph(process.transitions)
         self.queue = pqdict()
 
-        for transition in process.transitions:
-            self.queue[transition] = transition.next_occurrence()
+        super().__init__(process, state, t, tmax, steps)
 
     def __iter__(self):
 
@@ -269,7 +269,12 @@ class NextReactionMethod(TrajectorySampler):
             if not self.queue:
                 return
 
-            time, transition = self.queue.popitem()
+            next_transition_item = self.queue.popitem()
+
+            time = (next_transition_item[1])[0]
+            transition = next_transition_item[0]
+
+            #time, transition = nextTransition[1], nextTransition[0]
 
             if time > self.tmax:
                 break
@@ -278,6 +283,9 @@ class NextReactionMethod(TrajectorySampler):
                 self.time = time
                 transition.last_occurrence = time
                 self._perform_transition(transition)
+
+                self.update_transition(transition)
+
                 yield transition
 
         if self.tmax < float('inf'):
@@ -286,7 +294,23 @@ class NextReactionMethod(TrajectorySampler):
     def add_transition(self, transition):
         self.transitions.append(transition)
         self.dependency_graph.add_reaction(transition)
-        self.queue.additem(transition, transition.next_occurrence())
+        if self.queue.get(transition) is None:
+            self.queue.additem(transition, (transition.next_occurrence(self.time, self.state), 1))
+        else:
+            self.queue.updateItem(transition, (transition.next_occurrence(self.time, self.state),
+                                               self.queue.get(transition)[1] + 1))
+
+    def remove_transition(self, transition):
+        self.transitions.remove(transition)
+        self.dependency_graph.remove_reaction(transition)
+        if (self.queue.get(transition))[1] == 1:
+            del self.queue[transition]
+        else:
+            self.queue.update(transition, (transition.next_occurrence(self.time, self.state),
+                                           (self.queue.get(transition))[1] - 1))
+
+    def update_transition(self, transition):
+        self.queue.additem(transition, (transition.next_occurrence(self.time, self.state), 1))
 
     def update_state(self, dct):
         for rule in self.process.rules:
@@ -302,5 +326,5 @@ class NextReactionMethod(TrajectorySampler):
             if t == float('inf') and (r.rule or isinstance(r, Event))
         ]
         for i in reversed(depleted):
+            self.dependency_graph.remove_reaction(self.transitions[i])
             del self.transitions[i]
-            del self.dependency_graph
