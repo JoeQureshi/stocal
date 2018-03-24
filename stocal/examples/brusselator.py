@@ -20,6 +20,11 @@ traj = stocal.Process([
     stocal.MassAction({"x": 1}, {"d": 1}, 1.),
 ]).trajectory({}, tmax=50)
 
+counter = 0
+
 print("# time\tx\ty\tc\td")
 for transition in traj:
     print(traj.time, '\t'.join(str(traj.state[s]) for s in "xycd"))
+    counter += 1
+    print(counter)
+
