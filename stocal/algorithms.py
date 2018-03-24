@@ -28,7 +28,7 @@ interface by subclassing this abstract base class.
 import abc
 
 from .utils import with_metaclass
-from .structures import multiset, DependencyGraph
+from .structures import multiset, DependencyGraph, QueueWrapper
 from .transitions import Event, Reaction
 from pqdict import pqdict
 
@@ -255,7 +255,7 @@ class NextReactionMethod(TrajectorySampler):
     def __init__(self, process, state, t=0., tmax=float('inf'), steps=None):
 
         self.dependency_graph = DependencyGraph(process.transitions)
-        self.queue = pqdict()
+        self.queue = QueueWrapper()
 
         super().__init__(process, state, t, tmax, steps)
 
@@ -269,7 +269,7 @@ class NextReactionMethod(TrajectorySampler):
             if not self.queue:
                 return
 
-            next_transition_item = self.queue.popitem()
+            next_transition_item = self.queue.queue.popitem()
 
             time = (next_transition_item[1])[0]
             transition = next_transition_item[0]
@@ -294,23 +294,19 @@ class NextReactionMethod(TrajectorySampler):
     def add_transition(self, transition):
         self.transitions.append(transition)
         self.dependency_graph.add_reaction(transition)
-        if self.queue.get(transition) is None:
-            self.queue.additem(transition, (transition.next_occurrence(self.time, self.state), 1))
-        else:
-            self.queue.updateItem(transition, (transition.next_occurrence(self.time, self.state),
-                                               self.queue.get(transition)[1] + 1))
+        self.queue.add_transition(transition, self.time, self.state)
 
     def remove_transition(self, transition):
         self.transitions.remove(transition)
         self.dependency_graph.remove_reaction(transition)
-        if (self.queue.get(transition))[1] == 1:
-            del self.queue[transition]
-        else:
-            self.queue.update(transition, (transition.next_occurrence(self.time, self.state),
-                                           (self.queue.get(transition))[1] - 1))
+        self.queue.remove_transition(transition, self.time, self.state)
 
     def update_transition(self, transition):
-        self.queue.additem(transition, (transition.next_occurrence(self.time, self.state), 1))
+        self.queue.add_transition(transition, self.time, self.state)
+        for reactant in transition.affected_species:
+            for transition in self.dependency_graph.graph[next(iter(reactant.domain))]:
+                self.queue.queue.updateitem(transition, (transition.next_occurrence(self.time, self.state),
+                                      (self.queue.queue.get(transition))[1]))
 
     def update_state(self, dct):
         for rule in self.process.rules:
@@ -322,7 +318,7 @@ class NextReactionMethod(TrajectorySampler):
 
     def prune_transitions(self):
         depleted = [
-            i for i, (t, r) in enumerate(self.queue)
+            i for i, (t, r) in enumerate(self.queue.queue)
             if t == float('inf') and (r.rule or isinstance(r, Event))
         ]
         for i in reversed(depleted):
