@@ -7,6 +7,7 @@ in Dissipative Systems, J. Chem. Phys. 48, 1695 (1968).
 This is a simple example of a process with only static (non-infered)
 reactions. The deterministic system exhibits ascillations when b>a+1.
 """
+import time
 
 import stocal
 
@@ -23,8 +24,15 @@ traj = stocal.Process([
 counter = 0
 
 print("# time\tx\ty\tc\td")
+
+start = time.time()
+
 for transition in traj:
     print(traj.time, '\t'.join(str(traj.state[s]) for s in "xycd"))
     counter += 1
-    print(counter)
+    #print(counter)
+
+end = time.time()
+
+print(end - start)
 
