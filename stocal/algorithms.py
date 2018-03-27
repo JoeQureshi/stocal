@@ -282,7 +282,7 @@ class NextReactionMethod(TrajectorySampler):
                 transition.last_occurrence = time
                 self._perform_transition(transition)
 
-                self.update_transition(transition)
+                self.queue_wrapper.update_transition(transition, self.time, self.state, self.dependency_graph)
 
                 yield transition
 
@@ -298,13 +298,6 @@ class NextReactionMethod(TrajectorySampler):
         self.transitions.remove(transition)
         self.dependency_graph.remove_reaction(transition)
         self.queue_wrapper.remove_transition(transition, self.time, self.state)
-
-    def update_transition(self, transition):
-        self.queue_wrapper.add_transition(transition, self.time, self.state)
-        for reactant in transition.affected_species:
-            for transition in self.dependency_graph.graph[next(iter(reactant))]:
-                self.queue_wrapper.queue.updateitem(transition, (transition.next_occurrence(self.time, self.state),
-                                                                 (self.queue_wrapper.queue.get(transition))[1]))
 
     def update_state(self, dct):
         for rule in self.process.rules:
