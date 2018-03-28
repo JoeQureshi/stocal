@@ -168,5 +168,12 @@ class TestFirstReactionMethod(TestTrajectorySampler):
         self.assertAlmostEqual(sampler.time, 10)
 
 
+class NextReactionMethod(TestTrajectorySampler):
+    """Test stocal.algorithms.DirectMethod
+
+    This tests the regular TrajectorySampler interface."""
+    Sampler = stocal.algorithms.NextReactionMethod
+
+
 if __name__ == '__main__':
     unittest.main()

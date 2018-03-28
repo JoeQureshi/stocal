@@ -30,7 +30,6 @@ import abc
 from .utils import with_metaclass
 from .structures import multiset, DependencyGraph, QueueWrapper
 from .transitions import Event, Reaction
-from pqdict import pqdict
 
 
 class TrajectorySampler(with_metaclass(abc.ABCMeta, object)):
@@ -69,10 +68,10 @@ class TrajectorySampler(with_metaclass(abc.ABCMeta, object)):
         self.time = t
         self.tmax = tmax
 
+        self.transitions = []
         self.state = multiset()
         self.update_state(state)
 
-        self.transitions = []
         for transition in self.process.transitions:
             self.add_transition(transition)
 
@@ -215,6 +214,8 @@ class FirstReactionMethod(TrajectorySampler):
                 for trans in self.transitions
             ]
 
+            # print(self.transitions)
+
             if not firings:
                 break
             time, transition = min(firings, key=lambda item: item[0])
@@ -242,6 +243,7 @@ class FirstReactionMethod(TrajectorySampler):
 
     def add_transition(self, transition):
         self.transitions.append(transition)
+        print("called")
 
     def update_state(self, dct):
         for rule in self.process.rules:
@@ -259,6 +261,8 @@ class NextReactionMethod(TrajectorySampler):
 
         super().__init__(process, state, t, tmax, steps)
 
+        self.queue_wrapper.initialise_step(self.time, self.state)
+
     def __iter__(self):
 
         while True:
@@ -269,10 +273,19 @@ class NextReactionMethod(TrajectorySampler):
             if not self.queue_wrapper.queue.popkeys():
                 return
 
-            next_transition_item = self.queue_wrapper.queue.popitem()  # removes top item from heap
+            # print(self.queue_wrapper)
+            # print(self.dependency_graph)
+            # print(self.transitions)
 
-            time = (next_transition_item[1])[0]
-            transition = next_transition_item[0]
+            next_transition_item = self.queue_wrapper.queue.popitem()
+
+            time = (next_transition_item[1])
+            transition = (next_transition_item[0])[0]
+            multiplicity = (next_transition_item[0])[1]
+
+            # print("Time: " + str(time))
+            # print("Transition:" + str(transition))
+            # print("Multiplicity: " + str(multiplicity))
 
             if time > self.tmax:
                 break
@@ -282,7 +295,7 @@ class NextReactionMethod(TrajectorySampler):
                 transition.last_occurrence = time
                 self._perform_transition(transition)
 
-                self.queue_wrapper.update_transition(transition, self.time, self.state, self.dependency_graph)
+                self.queue_wrapper.update_transitions(transition, self.time, self.state, self.dependency_graph)
 
                 yield transition
 
@@ -293,17 +306,20 @@ class NextReactionMethod(TrajectorySampler):
         self.transitions.append(transition)
         self.dependency_graph.add_reaction(transition)
         self.queue_wrapper.add_transition(transition, self.time, self.state)
+        print("called")
 
-    def remove_transition(self, transition):
+    def remove_transition(self, transition, multiplicity):
         self.transitions.remove(transition)
         self.dependency_graph.remove_reaction(transition)
-        self.queue_wrapper.remove_transition(transition, self.time, self.state)
+        self.queue_wrapper.remove_transition(transition, multiplicity)
 
     def update_state(self, dct):
         for rule in self.process.rules:
             for trans in rule.infer_transitions(dct, self.state):
                 if trans not in self.transitions:
                     trans.rule = rule
+                    self.add_transition(trans)
+                else:
                     self.add_transition(trans)
         self.state.update(dct)
 
