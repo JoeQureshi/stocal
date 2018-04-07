@@ -168,7 +168,7 @@ class TestFirstReactionMethod(TestTrajectorySampler):
         self.assertAlmostEqual(sampler.time, 10)
 
 
-class NextReactionMethod(TestTrajectorySampler):
+class NextReactionMethod(TestFirstReactionMethod):
     """Test stocal.algorithms.DirectMethod
 
     This tests the regular TrajectorySampler interface."""

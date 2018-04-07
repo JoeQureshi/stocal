@@ -214,8 +214,6 @@ class FirstReactionMethod(TrajectorySampler):
                 for trans in self.transitions
             ]
 
-            # print(self.transitions)
-
             if not firings:
                 break
             time, transition = min(firings, key=lambda item: item[0])
@@ -243,7 +241,6 @@ class FirstReactionMethod(TrajectorySampler):
 
     def add_transition(self, transition):
         self.transitions.append(transition)
-        print("called")
 
     def update_state(self, dct):
         for rule in self.process.rules:
@@ -259,35 +256,26 @@ class NextReactionMethod(TrajectorySampler):
         self.dependency_graph = DependencyGraph(process.transitions)
         self.queue_wrapper = QueueWrapper()
 
-        super().__init__(process, state, t, tmax, steps)
+        super(NextReactionMethod, self).__init__(process, state, t, tmax, steps)
 
-        self.queue_wrapper.initialise_step(self.time, self.state)
+        self.queue_wrapper.initialise_transitions(self.time, self.state)
 
     def __iter__(self):
 
         while True:
             if self.steps is not None and self.step == self.steps:
                 return
-            # if self.time >= self.tmax:
-            #    break
-            if not self.queue_wrapper.queue.popkeys():
-                return
+            if self.time >= self.tmax:
+                break
+            if not self.queue_wrapper.queue:
+                break
 
-            # print(self.queue_wrapper)
-            # print(self.dependency_graph)
-            # print(self.transitions)
-
-            next_transition_item = self.queue_wrapper.queue.popitem()
+            next_transition_item = self.queue_wrapper.queue.topitem()
 
             time = (next_transition_item[1])
             transition = (next_transition_item[0])[0]
-            multiplicity = (next_transition_item[0])[1]
 
-            # print("Time: " + str(time))
-            # print("Transition:" + str(transition))
-            # print("Multiplicity: " + str(multiplicity))
-
-            if time > self.tmax:
+            if time >= self.tmax or time == float('inf'):
                 break
             else:
                 self.step += 1
@@ -306,7 +294,6 @@ class NextReactionMethod(TrajectorySampler):
         self.transitions.append(transition)
         self.dependency_graph.add_reaction(transition)
         self.queue_wrapper.add_transition(transition, self.time, self.state)
-        print("called")
 
     def remove_transition(self, transition, multiplicity):
         self.transitions.remove(transition)
@@ -319,9 +306,8 @@ class NextReactionMethod(TrajectorySampler):
                 if trans not in self.transitions:
                     trans.rule = rule
                     self.add_transition(trans)
-                else:
-                    self.add_transition(trans)
         self.state.update(dct)
+        self.queue_wrapper.update_state_transitions(dct, self.time, self.state, self.dependency_graph)
 
     def prune_transitions(self):
         depleted = [
